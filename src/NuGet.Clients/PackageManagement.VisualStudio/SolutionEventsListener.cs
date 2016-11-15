@@ -6,6 +6,7 @@ using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
 using Task = System.Threading.Tasks.Task;
+using ThreadHelper = Microsoft.VisualStudio.Shell.ThreadHelper;
 
 namespace NuGet.PackageManagement.VisualStudio
 {
@@ -13,7 +14,7 @@ namespace NuGet.PackageManagement.VisualStudio
     /// Attaching to one solution load event requires implementing all methods of two interfaces.
     /// This helper class is designed to reduce the verbosity of the boilerplate code.
     /// </summary>
-    internal abstract class SolutionEventsListener : IVsSolutionEvents, IVsSolutionLoadEvents
+    public abstract class SolutionEventsListener : IVsSolutionEvents, IVsSolutionLoadEvents
     {
         private IVsSolution _vsSolution;
         private uint _cookie;
@@ -28,6 +29,23 @@ namespace NuGet.PackageManagement.VisualStudio
             }
 
             _vsSolution = await site.GetServiceAsync<SVsSolution, IVsSolution>();
+            if (_vsSolution != null)
+            {
+                var hr = _vsSolution.AdviseSolutionEvents(this, out _cookie);
+                ErrorHandler.ThrowOnFailure(hr);
+            }
+        }
+
+        protected void Advise(IServiceProvider serviceProvider)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
+            if (serviceProvider == null)
+            {
+                throw new ArgumentNullException(nameof(serviceProvider));
+            }
+
+            _vsSolution = serviceProvider.GetService<SVsSolution, IVsSolution>();
             if (_vsSolution != null)
             {
                 var hr = _vsSolution.AdviseSolutionEvents(this, out _cookie);
