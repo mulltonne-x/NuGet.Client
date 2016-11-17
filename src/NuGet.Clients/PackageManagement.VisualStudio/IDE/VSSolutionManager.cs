@@ -18,7 +18,6 @@ using NuGet.Configuration;
 using NuGet.PackageManagement.Telemetry;
 using NuGet.ProjectManagement;
 using NuGet.ProjectManagement.Projects;
-using NuGet.ProjectModel;
 using NuGet.Protocol.Core.Types;
 
 namespace NuGet.PackageManagement.VisualStudio
@@ -292,6 +291,61 @@ namespace NuGet.PackageManagement.VisualStudio
                     return Path.IsPathRooted(globalPackagesFolder);
                 });
             }
+        }
+
+        public IEnumerable<string> GetDeferredProjectsFilePath()
+        {
+#if VS14
+            // Not applicable for Dev14 so always return empty list.
+            return Enumerable.Empty<string>();
+#else
+            return ThreadHelper.JoinableTaskFactory.Run(async delegate
+            {
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+
+                List<string> projectPaths = new List<string>();
+                IEnumHierarchies enumHierarchies;
+                Guid guid = Guid.Empty;
+                _vsSolution.GetProjectEnum((uint)__VSENUMPROJFLAGS3.EPF_DEFERRED, ref guid, out enumHierarchies);
+
+                // Loop all projects found
+                if (enumHierarchies != null)
+                {
+                    // Loop projects found
+                    IVsHierarchy[] hierarchy = new IVsHierarchy[1];
+                    uint fetched = 0;
+                    while (enumHierarchies.Next(1, hierarchy, out fetched) == VSConstants.S_OK && fetched == 1)
+                    {
+                        string projectPath;
+                        hierarchy[0].GetCanonicalName(VSConstants.VSITEMID_ROOT, out projectPath);
+
+                        if (!string.IsNullOrEmpty(projectPath))
+                        {
+                            projectPaths.Add(projectPath);
+                        }
+                    }
+                }
+
+                return projectPaths;
+            });
+#endif
+        }
+
+        public bool SolutionHasDeferredProjects()
+        {
+#if VS14
+            // for Dev14 always return false since DPL not exists there.
+            return false;
+#else
+            return ThreadHelper.JoinableTaskFactory.Run(async delegate
+            {
+                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                    
+                object value;
+                _vsSolution.GetProperty((int)(__VSPROPID7.VSPROPID_DeferredProjectCount), out value);
+                return (int)value != 0;
+            });
+#endif
         }
 
         public bool IsSolutionDPLEnabled
@@ -828,7 +882,7 @@ namespace NuGet.PackageManagement.VisualStudio
             dependentEnvDTEProjects.Add(dependentEnvDTEProject);
         }
 
-        #region IVsSelectionEvents
+#region IVsSelectionEvents
 
         public int OnCmdUIContextChanged(uint dwCmdUICookie, int fActive)
         {
@@ -860,9 +914,9 @@ namespace NuGet.PackageManagement.VisualStudio
             }
         }
 
-        #endregion IVsSelectionEvents
+#endregion IVsSelectionEvents
 
-        #region IVsSolutionManager
+#region IVsSolutionManager
 
         public async Task<NuGetProject> GetOrCreateProjectAsync(EnvDTE.Project project, INuGetProjectContext projectContext)
         {
@@ -881,6 +935,6 @@ namespace NuGet.PackageManagement.VisualStudio
             return nuGetProject;
         }
 
-        #endregion
+#endregion
     }
 }
