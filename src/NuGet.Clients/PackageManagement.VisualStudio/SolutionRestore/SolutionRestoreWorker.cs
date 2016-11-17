@@ -33,6 +33,7 @@ namespace NuGet.PackageManagement.VisualStudio
         private EnvDTE.SolutionEvents _solutionEvents;
         private readonly IComponentModel _componentModel;
         private readonly IVsSolutionManager _solutionManager;
+        private readonly IDeferredProjectWorkspaceService _deferredWorkspaceService;
 
         // these properties are specific to VS15 since they are use to attach to solution events
         // which is further used to start bg job runner to schedule auto restore
@@ -59,7 +60,8 @@ namespace NuGet.PackageManagement.VisualStudio
         public SolutionRestoreWorker(
             [Import(typeof(SVsServiceProvider))]
             IServiceProvider serviceProvider,
-            IVsSolutionManager solutionManager)
+            IVsSolutionManager solutionManager,
+            IDeferredProjectWorkspaceService deferredWorkspaceService)
         {
             if (serviceProvider == null)
             {
@@ -71,8 +73,14 @@ namespace NuGet.PackageManagement.VisualStudio
                 throw new ArgumentNullException(nameof(solutionManager));
             }
 
+            if (deferredWorkspaceService == null)
+            {
+                throw new ArgumentNullException(nameof(deferredWorkspaceService));
+            }
+
             _serviceProvider = serviceProvider;
             _solutionManager = solutionManager;
+            _deferredWorkspaceService = deferredWorkspaceService;
 
             var joinableTaskContextNode = new JoinableTaskContextNode(ThreadHelper.JoinableTaskContext);
             _joinableCollection = joinableTaskContextNode.CreateCollection();
@@ -329,7 +337,7 @@ namespace NuGet.PackageManagement.VisualStudio
             using (var logger = await RestoreOperationLogger.StartAsync(
                 _serviceProvider, _errorListProvider, blockingUi, jobCts))
             using (var job = await SolutionRestoreJob.CreateAsync(
-                _serviceProvider, _componentModel, logger, jobCts.Token))
+                _serviceProvider, _componentModel, _deferredWorkspaceService, logger, jobCts.Token))
             {
                 return await job.ExecuteAsync(jobArgs, _restoreJobContext, jobCts.Token);
             }
