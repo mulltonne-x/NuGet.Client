@@ -59,6 +59,9 @@
         "define": [
           "IS_DESKTOP"
         ]
+      },
+      "dependencies": {
+        "Microsoft.Build": "14.3.0"
       }
     },
     "netstandard1.3": {
