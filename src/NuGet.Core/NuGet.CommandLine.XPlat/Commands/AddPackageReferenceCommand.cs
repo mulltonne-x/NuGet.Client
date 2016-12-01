@@ -1,21 +1,21 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.Build.Framework;
 using Microsoft.Dnx.Runtime.Common.CommandLine;
+using NuGet.Commands;
+using NuGet.Common;
 using NuGet.Configuration;
+using NuGet.Packaging.Core;
+using NuGet.Versioning;
 
-namespace NuGet.CommandLine.XPlat.Commands
+namespace NuGet.CommandLine.XPlat
 {
     internal static class AddPackageReferenceCommand
     {
         public static void Register(CommandLineApplication app, Func<ILogger> getLogger)
         {
-            app.Command("dotnet add pkg", addPkgRef =>
+            app.Command("addpkg", addPkgRef =>
             {
-                addPkgRef.Description = Strings.LocalsCommand_Description;
+                addPkgRef.Description = "dotnet add pkg <project file> <package id> <package version>";
                 addPkgRef.HelpOption(XPlatUtility.HelpOption);
 
                 addPkgRef.Option(
@@ -23,50 +23,44 @@ namespace NuGet.CommandLine.XPlat.Commands
                     Strings.ForceEnglishOutput_Description,
                     CommandOptionType.NoValue);
 
-                var clear = addPkgRef.Option(
-                    "-c|--clear",
-                    Strings.LocalsCommand_ClearDescription,
-                    CommandOptionType.NoValue);
+                var project = addPkgRef.Option(
+                    "--project|-p",
+                    "Project file",
+                    CommandOptionType.SingleValue);
 
-                var list = addPkgRef.Option(
-                    "-l|--list",
-                    Strings.LocalsCommand_ListDescription,
-                    CommandOptionType.NoValue);
+                var id = addPkgRef.Option(
+                    "--package",
+                    "ID of the package",
+                    CommandOptionType.SingleValue);
 
-                var arguments = addPkgRef.Argument(
-                    "Cache Location(s)",
-                    Strings.LocalsCommand_ArgumentDescription,
-                    multipleValues: false);
+                var version = addPkgRef.Option(
+                    "--version",
+                    "Version of the package",
+                    CommandOptionType.SingleValue);
 
                 addPkgRef.OnExecute(() =>
                 {
                     var logger = getLogger();
-                    var setting = Settings.LoadDefaultSettings(root: null, configFileName: null, machineWideSettings: null);
-                    // Using both -clear and -list command options, or neither one of them, is not supported.
-                    // We use MinArgs = 0 even though the first argument is required,
-                    // to avoid throwing a command argument validation exception and
-                    // immediately show usage help for this command instead.
-                    if ((arguments.Values.Count < 1) || string.IsNullOrWhiteSpace(arguments.Values[0]))
-                    {
-                        throw new ArgumentException(string.Format(CultureInfo.CurrentCulture, Strings.LocalsCommand_NoArguments));
-                    }
-                    else if (clear.HasValue() && list.HasValue())
-                    {
-                        throw new ArgumentException(string.Format(CultureInfo.CurrentCulture, Strings.LocalsCommand_MultipleOperations));
-                    }
-                    else if (!clear.HasValue() && !list.HasValue())
-                    {
-                        throw new ArgumentException(string.Format(CultureInfo.CurrentCulture, Strings.LocalsCommand_NoOperation));
-                    }
-                    else
-                    {
-                        var localsArgs = new LocalsArgs(arguments.Values, setting, logger.LogInformation, logger.LogError, clear.HasValue(), list.HasValue());
-                        var localsCommandRunner = new LocalsCommandRunner();
-                        localsCommandRunner.ExecuteCommand(localsArgs);
-                    }
-
+                    var settings = Settings.LoadDefaultSettings(root: null, configFileName: null, machineWideSettings: null);
+                    ValidateArgument(project, "Project file not provided");
+                    ValidateArgument(id, "ID not given");
+                    ValidateArgument(version, "Version not given");
+                    logger.LogInformation("Starting copmmand");
+                    var packageIdentity = new PackageIdentity(id.Values[0], new NuGetVersion(version.Values[0]));
+                    var packageRefArgs = new PackageReferenceArgs(project.Values[0], packageIdentity, settings, logger);
+                    var addPackageRefCommandRunner = new AddPackageReferenceCommandRunner();
+                    addPackageRefCommandRunner.ExecuteCommand(packageRefArgs);
                     return 0;
                 });
             });
         }
+
+        private static void ValidateArgument(CommandOption arg, string exceptionMessage)
+        {
+            if ((arg.Values.Count < 1) || string.IsNullOrWhiteSpace(arg.Values[0]))
+            {
+                throw new ArgumentException(string.Format(CultureInfo.CurrentCulture, exceptionMessage));
+            }
+        }
     }
+}

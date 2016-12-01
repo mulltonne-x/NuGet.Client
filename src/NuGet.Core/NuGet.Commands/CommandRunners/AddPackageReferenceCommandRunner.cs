@@ -15,9 +15,16 @@ namespace NuGet.Commands
     {
         public void ExecuteCommand(PackageReferenceArgs packageReferenceArgs)
         {
+            packageReferenceArgs.Logger.LogInformation("Starting restore preview");
+            var restorePreviewResult = PreviewAddPackageReference(packageReferenceArgs);
+            packageReferenceArgs.Logger.LogInformation("Returned from restore preview");
+            foreach (var result in restorePreviewResult)
+            {
+                packageReferenceArgs.Logger.LogInformation(result.ToString());
+            }
         }
 
-        public async Task<IReadOnlyList<RestoreSummary>> PreviewAddPackageReference(PackageReferenceArgs packageReferenceArgs)
+        public IReadOnlyList<RestoreSummary> PreviewAddPackageReference(PackageReferenceArgs packageReferenceArgs)
         {
             if (packageReferenceArgs == null)
             {
@@ -38,7 +45,12 @@ namespace NuGet.Commands
                     MachineWideSettings = new XPlatMachineWideSetting(),
                     CachingSourceProvider = sourceProvider
                 };
-                return await RestoreRunner.Run(restoreContext);
+
+                var restoreSummaries = RestoreRunner.Run(restoreContext).Result;
+
+                // Summary
+                RestoreSummary.Log(packageReferenceArgs.Logger, restoreSummaries);
+                return restoreSummaries;
             }
         }
     }
