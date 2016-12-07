@@ -20,6 +20,9 @@ namespace NuGet.Commands
 {
     public class AddPackageReferenceCommandRunner
     {
+        private static string DOTNET_ADD_PKG_AGENT = "dotnet add pkg";
+        private static string NUGET_RESTORE_MSBUILD_VERBOSITY = "NUGET_RESTORE_MSBUILD_VERBOSITY";
+
         public void ExecuteCommand(PackageReferenceArgs packageReferenceArgs)
         {
             using (var dgFilePath = new TempFile(".dg"))
@@ -48,9 +51,25 @@ namespace NuGet.Commands
                     .Distinct()
                     .ToList();
 
-                var successfulFrameworks = projectFrameworks
-                    .Except(unsuccessfulFrameworks)
-                    .ToList().Select(fx => fx.Framework);
+                if (unsuccessfulFrameworks.Count == projectFrameworks.Count)
+                {
+                    // Package is compatible with none of the project TFMs
+                    // Do not add a package reference, throw appropriate error
+                }
+                else if (unsuccessfulFrameworks.Count == 0)
+                {
+                    // Package is compatible with all the project TFMs
+                    // Add an unconditional package reference to the project
+                }
+                else
+                {
+                    // Package is compatible with some of the project TFMs
+                    // Add conditional package references to the project for the compatible TFMs
+                    var successfulFrameworks = projectFrameworks
+                        .Except(unsuccessfulFrameworks)
+                        .Select(fx => fx.Framework)
+                        .ToList();
+                }
 
                 // 4. Write to Project
             }
@@ -62,8 +81,9 @@ namespace NuGet.Commands
             {
                 throw new ArgumentNullException(nameof(packageReferenceArgs));
             }
+
             // Set user agent and connection settings.
-            ConfigureProtocol();
+            CommandRunnerUtility.ConfigureProtocol(DOTNET_ADD_PKG_AGENT);
 
             //var graphLines = RestoreGraphItems;
             var providerCache = new RestoreCommandProvidersCache();
@@ -111,31 +131,6 @@ namespace NuGet.Commands
             }
         }
 
-        private static void ConfigureProtocol()
-        {
-            // Set connection limit
-            NetworkProtocolUtility.SetConnectionLimit();
-
-            // Set user agent string used for network calls
-            SetUserAgent();
-
-            // This method has no effect on .NET Core.
-            NetworkProtocolUtility.ConfigureSupportedSslProtocols();
-        }
-
-        private static void SetUserAgent()
-        {
-            var agent = "dotnet addref Task";
-
-#if IS_CORECLR
-            UserAgent.SetUserAgentString(new UserAgentStringBuilder(agent)
-                .WithOSDescription(RuntimeInformation.OSDescription));
-#else
-            // OS description is set by default on Desktop
-            UserAgent.SetUserAgentString(new UserAgentStringBuilder(agent));
-#endif
-        }
-
         private static async Task<DependencyGraphSpec> GetProjectDependencyGraphAsync(
             PackageReferenceArgs packageReferenceArgs,
             string dgFilePath,
@@ -152,7 +147,7 @@ namespace NuGet.Commands
             var argumentBuilder = new StringBuilder($@" /t:GenerateRestoreGraphFile");
 
             // Set the msbuild verbosity level if specified
-            var msbuildVerbosity = Environment.GetEnvironmentVariable("NUGET_RESTORE_MSBUILD_VERBOSITY");
+            var msbuildVerbosity = Environment.GetEnvironmentVariable(NUGET_RESTORE_MSBUILD_VERBOSITY);
 
             if (string.IsNullOrEmpty(msbuildVerbosity))
             {

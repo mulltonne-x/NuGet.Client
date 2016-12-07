@@ -3,7 +3,9 @@
 
 using System;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using NuGet.Common;
 using NuGet.Configuration;
 using NuGet.Protocol;
 using NuGet.Protocol.Core.Types;
@@ -89,6 +91,31 @@ namespace NuGet.Commands
             var sourceRepository = sourceRepositoryProvider.CreateRepository(packageSource);
 
             return await sourceRepository.GetResourceAsync<PackageUpdateResource>();
+        }
+
+        public static void ConfigureProtocol(string agent)
+        {
+            // Set connection limit
+            NetworkProtocolUtility.SetConnectionLimit();
+
+            // Set user agent string used for network calls
+            SetUserAgent(agent);
+
+            // This method has no effect on .NET Core.
+            NetworkProtocolUtility.ConfigureSupportedSslProtocols();
+        }
+
+        private static void SetUserAgent(string agent)
+        {
+            var agent = "dotnet addref Task";
+
+#if IS_CORECLR
+            UserAgent.SetUserAgentString(new UserAgentStringBuilder(agent)
+                .WithOSDescription(RuntimeInformation.OSDescription));
+#else
+            // OS description is set by default on Desktop
+            UserAgent.SetUserAgentString(new UserAgentStringBuilder(agent));
+#endif
         }
     }
 }

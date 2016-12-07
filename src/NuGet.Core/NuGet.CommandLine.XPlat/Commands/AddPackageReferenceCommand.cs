@@ -18,18 +18,13 @@ namespace NuGet.CommandLine.XPlat
         {
             app.Command("addpkg", addPkgRef =>
             {
-                addPkgRef.Description = "dotnet add pkg <project file> <package id> <package version>";
+                addPkgRef.Description = "dotnet add pkg <package id> <package version>";
                 addPkgRef.HelpOption(XPlatUtility.HelpOption);
 
                 addPkgRef.Option(
                     CommandConstants.ForceEnglishOutputOption,
                     Strings.ForceEnglishOutput_Description,
                     CommandOptionType.NoValue);
-
-                var project = addPkgRef.Option(
-                    "--project|-p",
-                    "Project file",
-                    CommandOptionType.SingleValue);
 
                 var id = addPkgRef.Option(
                     "--package",
@@ -45,12 +40,11 @@ namespace NuGet.CommandLine.XPlat
                 {
                     var logger = getLogger();
                     var settings = Settings.LoadDefaultSettings(root: null, configFileName: null, machineWideSettings: null);
-                    ValidateArgument(project, "Project file not provided");
                     ValidateArgument(id, "ID not given");
                     ValidateArgument(version, "Version not given");
                     logger.LogInformation("Starting copmmand");
                     var packageIdentity = new PackageIdentity(id.Values[0], new NuGetVersion(version.Values[0]));
-                    var packageRefArgs = new PackageReferenceArgs(project.Values[0], packageIdentity, settings, logger);
+                    var packageRefArgs = new PackageReferenceArgs("DotnetPath must go here", packageIdentity, settings, logger);
                     var addPackageRefCommandRunner = new AddPackageReferenceCommandRunner();
                     addPackageRefCommandRunner.ExecuteCommand(packageRefArgs);
                     return 0;
