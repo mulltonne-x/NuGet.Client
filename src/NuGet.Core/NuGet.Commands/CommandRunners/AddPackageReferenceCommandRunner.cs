@@ -22,100 +22,92 @@ namespace NuGet.Commands
     {
         public void ExecuteCommand(PackageReferenceArgs packageReferenceArgs)
         {
-            packageReferenceArgs.Logger.LogInformation("Starting restore preview");
-            var restorePreviewResult = PreviewAddPackageReference(packageReferenceArgs).Result;
-            packageReferenceArgs.Logger.LogInformation("Returned from restore preview");
+            using (var dgFilePath = new TempFile(".dg"))
+            {
+                // 1. Get project dg file
+                var dgSpec = GetProjectDependencyGraphAsync(packageReferenceArgs, dgFilePath, timeOut: 5000, recursive: true).Result;
+                var projectName = dgSpec.Restore.FirstOrDefault();
+                var originalPackageSpec = dgSpec.GetProjectSpec(projectName);
+
+                // 2. Run Restore Preview
+                var restorePreviewResult = PreviewAddPackageReference(packageReferenceArgs, dgSpec, originalPackageSpec).Result;
+
+                // 3. Process Restore Result
+
+                var projectFrameworks = originalPackageSpec
+                    .TargetFrameworks
+                    .Select(t => t.FrameworkName)
+                    .Distinct()
+                    .ToList();
+
+                var unsuccessfulFrameworks = restorePreviewResult
+                    .Result
+                    .CompatibilityCheckResults
+                    .Where(t => !t.Success)
+                    .Select(t => t.Graph.Framework)
+                    .Distinct()
+                    .ToList();
+
+                var successfulFrameworks = projectFrameworks
+                    .Except(unsuccessfulFrameworks)
+                    .ToList().Select(fx => fx.Framework);
+
+                // 4. Write to Project
+            }
         }
 
-        public async Task<IReadOnlyList<RestoreResultPair>> PreviewAddPackageReference(PackageReferenceArgs packageReferenceArgs)
+        private async Task<RestoreResultPair> PreviewAddPackageReference(PackageReferenceArgs packageReferenceArgs, DependencyGraphSpec dgSpec, PackageSpec originalPackageSpec)
         {
             if (packageReferenceArgs == null)
             {
                 throw new ArgumentNullException(nameof(packageReferenceArgs));
             }
-            // 1. Get project dg file
-            // 2. Run Restore Preview
-            // 3. Process Restore Result
-            // 4. Write to Project
+            // Set user agent and connection settings.
+            ConfigureProtocol();
 
-            using (var dgFilePath = new TempFile(".dg"))
+            //var graphLines = RestoreGraphItems;
+            var providerCache = new RestoreCommandProvidersCache();
+
+            using (var cacheContext = new SourceCacheContext())
             {
-                var dgSpecTask = GetProjectDependencyGraphAsync(packageReferenceArgs, dgFilePath, timeOut: 5000, recursive: true);
+                cacheContext.NoCache = false;
+                cacheContext.IgnoreFailedSources = true;
 
-                // Set user agent and connection settings.
-                ConfigureProtocol();
+                // Pre-loaded request provider containing the graph file
+                var providers = new List<IPreLoadedRestoreRequestProvider>();
+                var defaultSettings = Settings.LoadDefaultSettings(root: null, configFileName: null, machineWideSettings: null);
+                var sourceProvider = new CachingSourceProvider(new PackageSourceProvider(defaultSettings));
 
-                //var graphLines = RestoreGraphItems;
-                var providerCache = new RestoreCommandProvidersCache();
+                // Create a copy to avoid modifying the original spec which may be shared.
+                var updatedPackageSpec = originalPackageSpec.Clone();
 
-                using (var cacheContext = new SourceCacheContext())
+                PackageSpecOperations.AddOrUpdateDependency(updatedPackageSpec, packageReferenceArgs.PackageIdentity);
+
+                providers.Add(new DependencyGraphSpecRequestProvider(providerCache, dgSpec));
+
+                var restoreContext = new RestoreArgs()
                 {
-                    cacheContext.NoCache = false;
-                    cacheContext.IgnoreFailedSources = true;
+                    CacheContext = cacheContext,
+                    LockFileVersion = LockFileFormat.Version,
+                    DisableParallel = true,
+                    Log = packageReferenceArgs.Logger,
+                    MachineWideSettings = new XPlatMachineWideSetting(),
+                    PreLoadedRequestProviders = providers,
+                    CachingSourceProvider = sourceProvider
+                };
 
-                    // Pre-loaded request provider containing the graph file
-                    var providers = new List<IPreLoadedRestoreRequestProvider>();
-                    var defaultSettings = Settings.LoadDefaultSettings(root: null, configFileName: null, machineWideSettings: null);
-                    var sourceProvider = new CachingSourceProvider(new PackageSourceProvider(defaultSettings));
-
-                    //wait for the GenerateDGSpecTask to finish
-                    var dgSpec = await dgSpecTask;
-
-                    if (dgSpec.Restore.Count < 1)
-                    {
-                        // Restore will fail if given no inputs, but here we should skip it.
-                        return Enumerable.Empty<RestoreResultPair>().ToList();
-                    }
-
-                    // Add the new package into dgSpec
-                    var project = dgSpec.Restore.FirstOrDefault();
-
-                    var originalPackageSpec = dgSpec.GetProjectSpec(project);
-
-                    // Create a copy to avoid modifying the original spec which may be shared.
-                    var updatedPackageSpec = originalPackageSpec.Clone();
-
-                    PackageSpecOperations.AddOrUpdateDependency(updatedPackageSpec, packageReferenceArgs.PackageIdentity);
-
-                    providers.Add(new DependencyGraphSpecRequestProvider(providerCache, dgSpec));
-
-                    var restoreContext = new RestoreArgs()
-                    {
-                        CacheContext = cacheContext,
-                        LockFileVersion = LockFileFormat.Version,
-                        DisableParallel = true,
-                        Log = packageReferenceArgs.Logger,
-                        MachineWideSettings = new XPlatMachineWideSetting(),
-                        PreLoadedRequestProviders = providers,
-                        CachingSourceProvider = sourceProvider
-                    };
-
-                    if (restoreContext.DisableParallel)
-                    {
-                        HttpSourceResourceProvider.Throttle = SemaphoreSlimThrottle.CreateBinarySemaphore();
-                    }
-
-                    var restoreRequests = await RestoreRunner.GetRequests(restoreContext);
-                    var restoreResult = await RestoreRunner.RunWithoutCommit(restoreRequests, restoreContext);
-
-                    var allFrameworks = updatedPackageSpec.TargetFrameworks
-                                                          .Select(t => t.FrameworkName)
-                                                          .Distinct()
-                                                          .ToList();
-
-                    var unsuccessfulFrameworks = restoreResult.Single()
-                                                              .Result
-                                                              .CompatibilityCheckResults
-                                                              .Where(t => !t.Success)
-                                                              .Select(t => t.Graph.Framework)
-                                                              .Distinct()
-                                                              .ToList();
-
-                    var successfulFrameworks = allFrameworks.Except(unsuccessfulFrameworks)
-                                                            .ToList();
-
-                    return restoreResult;
+                if (restoreContext.DisableParallel)
+                {
+                    HttpSourceResourceProvider.Throttle = SemaphoreSlimThrottle.CreateBinarySemaphore();
                 }
+
+                // Generate Restore Requests. There will always be 1 request here since we are restoring for 1 project.
+                var restoreRequests = await RestoreRunner.GetRequests(restoreContext);
+
+                // Run restore without commit. This will always return 1 Result pair since we are restoring for 1 request.
+                var restoreResult = await RestoreRunner.RunWithoutCommit(restoreRequests, restoreContext);
+
+                return restoreResult.Single();
             }
         }
 
@@ -144,7 +136,7 @@ namespace NuGet.Commands
 #endif
         }
 
-        public static async Task<DependencyGraphSpec> GetProjectDependencyGraphAsync(
+        private static async Task<DependencyGraphSpec> GetProjectDependencyGraphAsync(
             PackageReferenceArgs packageReferenceArgs,
             string dgFilePath,
             int timeOut,
