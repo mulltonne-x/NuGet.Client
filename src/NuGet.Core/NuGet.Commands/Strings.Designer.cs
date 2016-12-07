@@ -96,6 +96,42 @@ namespace NuGet.Commands {
         }
         
         /// <summary>
+        ///    Looks up a localized string similar to Dotnet msbuild timeout out while trying to get project to project references and dotnet could not kill the process..
+        /// </summary>
+        public static string Error_CannotKillDotnetMsBuild {
+            get {
+                return ResourceManager.GetString("Error_CannotKillDotnetMsBuild", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///    Looks up a localized string similar to Dotnet msbuild timeout out while trying to get project to project references..
+        /// </summary>
+        public static string Error_DotnetMsBuildTimedOut {
+            get {
+                return ResourceManager.GetString("Error_DotnetMsBuildTimedOut", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///    Looks up a localized string similar to Failed to locate dotnet in dotnet add pkg command.
+        /// </summary>
+        public static string Error_DotnetNotFound {
+            get {
+                return ResourceManager.GetString("Error_DotnetNotFound", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///    Looks up a localized string similar to Failed to create random file for dotnet add pkg command..
+        /// </summary>
+        public static string Error_FailedToCreateRandomFile {
+            get {
+                return ResourceManager.GetString("Error_FailedToCreateRandomFile", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///    Looks up a localized string similar to Invalid input &apos;{0}&apos;. The file type was not recognized..
         /// </summary>
         public static string Error_InvalidCommandLineInput {

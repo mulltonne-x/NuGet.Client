@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Globalization;
+using System.IO;
 using Microsoft.Dnx.Runtime.Common.CommandLine;
 using NuGet.Commands;
 using NuGet.Common;
@@ -11,6 +12,8 @@ namespace NuGet.CommandLine.XPlat
 {
     internal static class AddPackageReferenceCommand
     {
+        private const string MSBuildExeName = "MSBuild.dll";
+
         public static void Register(CommandLineApplication app, Func<ILogger> getLogger)
         {
             app.Command("addpkg", addPkgRef =>

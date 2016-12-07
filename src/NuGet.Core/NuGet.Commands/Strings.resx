@@ -511,4 +511,16 @@ For more information, visit http://docs.nuget.org/docs/reference/command-line-re
     <value>Clearing NuGet Temp cache: {0}</value>
     <comment>{0} : Temp cache path</comment>
   </data>
+  <data name="Error_CannotKillDotnetMsBuild" xml:space="preserve">
+    <value>Dotnet msbuild timeout out while trying to get project to project references and dotnet could not kill the process.</value>
+  </data>
+  <data name="Error_DotnetMsBuildTimedOut" xml:space="preserve">
+    <value>Dotnet msbuild timeout out while trying to get project to project references.</value>
+  </data>
+  <data name="Error_DotnetNotFound" xml:space="preserve">
+    <value>Failed to locate dotnet in dotnet add pkg command</value>
+  </data>
+  <data name="Error_FailedToCreateRandomFile" xml:space="preserve">
+    <value>Failed to create random file for dotnet add pkg command.</value>
+  </data>
 </root>
