@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -10,6 +11,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+using NuGet.Commands.Utility;
 using NuGet.Common;
 using NuGet.Configuration;
 using NuGet.ProjectModel;
@@ -60,6 +62,8 @@ namespace NuGet.Commands
                 {
                     // Package is compatible with all the project TFMs
                     // Add an unconditional package reference to the project
+                    var project = MSBuildAPIUtility.GetProject(packageReferenceArgs.ProjectPath);
+                    MSBuildAPIUtility.AddPackageReferenceAllTFMs(project, packageReferenceArgs.PackageIdentity);
                 }
                 else
                 {
@@ -69,6 +73,7 @@ namespace NuGet.Commands
                         .Except(unsuccessfulFrameworks)
                         .Select(fx => fx.Framework)
                         .ToList();
+                    var project = MSBuildAPIUtility.GetProject(packageReferenceArgs.ProjectPath);
                 }
 
                 // 4. Write to Project
@@ -168,22 +173,26 @@ namespace NuGet.Commands
                 argumentBuilder.Append($" /p:RestoreRecursive=true ");
             }
 
+            packageReferenceArgs.Logger.LogInformation($"{dotnetLocation} msbuild {argumentBuilder.ToString()}");
+
             var processStartInfo = new ProcessStartInfo
             {
                 UseShellExecute = false,
                 FileName = dotnetLocation,
-                WorkingDirectory = Path.GetDirectoryName(packageReferenceArgs.ProjectPath),
+                // WorkingDirectory = Path.GetDirectoryName(packageReferenceArgs.ProjectPath),
                 Arguments = $"msbuild {argumentBuilder.ToString()}",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
+                RedirectStandardError = true,
+                RedirectStandardOutput = true
             };
 
             packageReferenceArgs.Logger.LogDebug($"{processStartInfo.FileName} {processStartInfo.Arguments}");
 
             using (var process = Process.Start(processStartInfo))
             {
-                var errors = new StringBuilder();
-                var errorTask = ConsumeStreamReaderAsync(process.StandardError, errors);
+                var outputs = new ConcurrentQueue<string>();
+                var outputTask = ConsumeStreamReaderAsync(process.StandardOutput, outputs);
+                var errorTask = ConsumeStreamReaderAsync(process.StandardError, outputs);
+
                 var finished = process.WaitForExit(timeOut);
                 if (!finished)
                 {
@@ -204,7 +213,9 @@ namespace NuGet.Commands
                 if (process.ExitCode != 0)
                 {
                     await errorTask;
-                    throw new Exception(errors.ToString());
+                    await outputTask;
+                    LogQueue(outputs, packageReferenceArgs.Logger);
+                    throw new Exception("Generate DGSpec task failed");
                 }
             }
 
@@ -223,6 +234,14 @@ namespace NuGet.Commands
             return spec;
         }
 
+        private static void LogQueue(ConcurrentQueue<string> outputs, ILogger logger)
+        {
+            foreach (var line in outputs)
+            {
+                logger.LogError(line);
+            }
+        }
+
         private static void AppendQuoted(StringBuilder builder, string targetPath)
         {
             builder
@@ -231,14 +250,14 @@ namespace NuGet.Commands
                 .Append('"');
         }
 
-        private static async Task ConsumeStreamReaderAsync(StreamReader reader, StringBuilder lines)
+        private static async Task ConsumeStreamReaderAsync(StreamReader reader, ConcurrentQueue<string> lines)
         {
             await Task.Yield();
 
             string line;
             while ((line = await reader.ReadLineAsync()) != null)
             {
-                lines.AppendLine(line);
+                lines.Enqueue(line);
             }
         }
 

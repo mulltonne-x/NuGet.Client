@@ -67,7 +67,8 @@
     "netstandard1.3": {
       "dependencies": {
         "NETStandard.Library": "1.6.0",
-        "System.Xml.XDocument": "4.0.11"
+        "System.Xml.XDocument": "4.0.11",
+        "Microsoft.Build": "14.3.0"
       },
       "buildOptions": {
         "define": [
