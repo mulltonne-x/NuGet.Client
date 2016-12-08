@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.Build.Construction;
 using Microsoft.Build.Evaluation;
 using NuGet.Packaging.Core;
@@ -15,12 +15,17 @@ namespace NuGet.Commands.Utility
 
         public static Project GetProject(string projectCSProjPath)
         {
-            return new Project(ProjectRootElement.Open(projectCSProjPath));
+            var projectRootElement = TryOpenProjectRootElement(projectCSProjPath);
+            if (projectCSProjPath == null)
+            {
+                throw new Exception(string.Format(CultureInfo.CurrentCulture, Strings.Error_MSBuildUnableToOpenProject));
+            }
+            return new Project(projectRootElement);
         }
 
         public static void AddPackageReferenceAllTFMs(Project project, PackageIdentity packageIdentity)
         {
-            var itemGroups = GetItemGroups(project, condition: "");
+            var itemGroups = GetItemGroups(project, condition: string.Empty);
 
             // Add packageReference only if it does not exist for any target framework
             if (!PackageReferenceExists(itemGroups, packageIdentity))
@@ -98,6 +103,20 @@ namespace NuGet.Commands.Utility
             {
                 return itemGroups.Any(itemGroup => itemGroup.Items.Any(item => item.ItemType.Equals(PACKAGE_REFERENCE_TYPE_TAG)
                                                                              && item.Include.Equals(packageIdentity.Id)));
+            }
+        }
+
+        // There is ProjectRootElement.TryOpen but it does not work as expected
+        // I.e. it returns null for some valid projects
+        private static ProjectRootElement TryOpenProjectRootElement(string filename)
+        {
+            try
+            {
+                return ProjectRootElement.Open(filename);
+            }
+            catch (Microsoft.Build.Exceptions.InvalidProjectFileException)
+            {
+                return null;
             }
         }
     }

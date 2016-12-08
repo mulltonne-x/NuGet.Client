@@ -137,7 +137,7 @@ namespace NuGet.Commands
             int timeOut,
             bool recursive)
         {
-            var dotnetLocation = @"F:\paths\dotnet\dotnet.exe";//NuGetEnvironment.GetDotNetLocation();
+            var dotnetLocation = packageReferenceArgs.DotnetPath;
 
             if (!File.Exists(dotnetLocation))
             {
@@ -172,6 +172,7 @@ namespace NuGet.Commands
             {
                 UseShellExecute = false,
                 FileName = dotnetLocation,
+                WorkingDirectory = Path.GetDirectoryName(packageReferenceArgs.ProjectPath),
                 Arguments = $"msbuild {argumentBuilder.ToString()}",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true

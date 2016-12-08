@@ -177,6 +177,15 @@ namespace NuGet.Commands {
         }
         
         /// <summary>
+        ///    Looks up a localized string similar to MSBuild was unable to open Project &apos;{0}&apos;.
+        /// </summary>
+        public static string Error_MSBuildUnableToOpenProject {
+            get {
+                return ResourceManager.GetString("Error_MSBuildUnableToOpenProject", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///    Looks up a localized string similar to Failed to build package. Ensure &apos;{0}&apos; includes assembly files. For help on building symbols package, visit {1}..
         /// </summary>
         public static string Error_PackageCommandNoFilesForLibPackage {

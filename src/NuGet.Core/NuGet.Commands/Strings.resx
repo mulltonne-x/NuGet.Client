@@ -523,4 +523,8 @@ For more information, visit http://docs.nuget.org/docs/reference/command-line-re
   <data name="Error_FailedToCreateRandomFile" xml:space="preserve">
     <value>Failed to create random file for dotnet add pkg command.</value>
   </data>
+  <data name="Error_MSBuildUnableToOpenProject" xml:space="preserve">
+    <value>MSBuild was unable to open Project '{0}'</value>
+    <comment>{0} - Project/csproj path</comment>
+  </data>
 </root>

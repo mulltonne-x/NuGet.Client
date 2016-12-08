@@ -40,11 +40,13 @@ namespace NuGet.CommandLine.XPlat
                 {
                     var logger = getLogger();
                     var settings = Settings.LoadDefaultSettings(root: null, configFileName: null, machineWideSettings: null);
+                    var dotnetPath = @"F:\paths\dotnet\dotnet.exe";
+                    var projectPath = @"F:\validation\test\test.csproj";
                     ValidateArgument(id, "ID not given");
                     ValidateArgument(version, "Version not given");
                     logger.LogInformation("Starting copmmand");
                     var packageIdentity = new PackageIdentity(id.Values[0], new NuGetVersion(version.Values[0]));
-                    var packageRefArgs = new PackageReferenceArgs("DotnetPath must go here", packageIdentity, settings, logger);
+                    var packageRefArgs = new PackageReferenceArgs(dotnetPath, projectPath, packageIdentity, settings, logger);
                     var addPackageRefCommandRunner = new AddPackageReferenceCommandRunner();
                     addPackageRefCommandRunner.ExecuteCommand(packageRefArgs);
                     return 0;

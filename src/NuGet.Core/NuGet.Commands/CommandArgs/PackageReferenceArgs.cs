@@ -11,16 +11,21 @@ namespace NuGet.Commands
 {
     public class PackageReferenceArgs
     {
-        public string ProjectCSProj { get; }
-        public PackageIdentity PackageIdentity { get; set; }
+        public string DotnetPath { get; }
+        public string ProjectPath { get; }
+        public PackageIdentity PackageIdentity { get; }
         public ISettings Settings { get; }
         public ILogger Logger { get; }
 
-        public PackageReferenceArgs(string projectCSProj, PackageIdentity packageIdentity, ISettings settings, ILogger logger)
+        public PackageReferenceArgs(string dotnetPath, string projectPath, PackageIdentity packageIdentity, ISettings settings, ILogger logger)
         {
-            if (projectCSProj == null)
+            if (dotnetPath == null)
             {
-                throw new ArgumentNullException(nameof(projectCSProj));
+                throw new ArgumentNullException(nameof(dotnetPath));
+            }
+            else if (projectPath == null)
+            {
+                throw new ArgumentNullException(nameof(projectPath));
             }
             else if (packageIdentity == null)
             {
@@ -34,10 +39,12 @@ namespace NuGet.Commands
             {
                 throw new ArgumentNullException(nameof(logger));
             }
-            ProjectCSProj = projectCSProj;
+
+            ProjectPath = projectPath;
             PackageIdentity = packageIdentity;
             Settings = settings;
             Logger = logger;
+            DotnetPath = dotnetPath;
         }
     }
 }
