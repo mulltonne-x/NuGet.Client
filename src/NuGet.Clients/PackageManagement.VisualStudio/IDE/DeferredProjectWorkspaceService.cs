@@ -5,13 +5,13 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Threading;
 using Microsoft.VisualStudio.Workspace;
 using Microsoft.VisualStudio.Workspace.Indexing;
 using Microsoft.VisualStudio.Workspace.VSIntegration;
+using Microsoft.VisualStudio.Workspace.Extensions.MSBuild;
 
 namespace NuGet.PackageManagement.VisualStudio
 {
@@ -54,6 +54,22 @@ namespace NuGet.PackageManagement.VisualStudio
             var indexService = workspace.GetIndexWorkspaceService();
             var fileReferenceResult = await indexService.GetFileReferencesAsync(projectFilePath, referenceTypes: (int)FileReferenceInfoType.ProjectReference);
             return fileReferenceResult.Select(f => workspace.MakeRooted(f.Path));
+        }
+
+        public async Task<IMSBuildProjectDataService> GetMSBuildProjectDataService(string projectFilePath)
+        {
+            var factory = SolutionWorkspaceService.GetService(typeof(IVsSolutionMSBuildProjectServiceFactory)) as IVsSolutionMSBuildProjectServiceFactory;
+            return await factory.GetMSBuildProjectDataServiceAsync(projectFilePath);
+        }
+
+        public async Task<IEnumerable<MSBuildProjectItemData>> GetProjectItemsAsync(IMSBuildProjectDataService dataService, string itemType)
+        {
+            return await dataService.GetProjectItems(itemType);
+        }
+
+        public async Task<string> GetProjectPropertyAsync(IMSBuildProjectDataService dataService, string propertyName)
+        {
+            return (await dataService.GetProjectProperty(propertyName)).EvaluatedValue;
         }
     }
 }
